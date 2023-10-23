@@ -3,17 +3,12 @@
 #include <chrono>
 #include <functional>
 #include <vector>
-#include <iostream>
 
 namespace s21 {
 
 namespace Time {
 
 typedef decltype((std::chrono::high_resolution_clock::now)()) T;
-
-T Now() {
-    return std::chrono::high_resolution_clock::now();
-}
 
 typedef std::chrono::hours h;
 typedef std::chrono::minutes min;

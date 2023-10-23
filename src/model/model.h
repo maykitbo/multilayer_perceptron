@@ -3,67 +3,185 @@
 #include <vector>
 #include "data_manager.h"
 #include "../common/metrics.h"
+#include "../common/perceptron_settings.h"
+#include "../lib/m_time.h"
+
+
+#include "../common/error_thread.h"
 
 namespace s21 {
 
+/**
+ * @class Model
+ * @brief Abstract class for perceptron model
+ */
 class Model {
     public:
+        /**
+         * @brief Construct a new Model object
+         */
         Model() {}
-        void Learn(DataManager &letters, int epoch_count) {
-            // MetricsMaker metrics;
 
-            int count = 0;
-            for (int k = 0; k < epoch_count; ++k) {
-                letters.ForTrain([&] (data_vector &letter, int name) {
-                    letter_ = &letter;
-                    Forward();
+        /**
+         * @brief Train the model using training data.
+         * @param letters DataManager dataset.
+         * @param epoch_count Number of training epochs.
+         * @param stop A flag to control the training loop.
+         * @param error_thread Flag to send errors to a separate thread.
+         * @param metric_thread Flag to send metrics to a separate thread.
+         */
+        void Train(DataManager &letters, unsigned int epoch_count, unsigned batch,
+                bool &stop, bool error_thread = true, bool metric_thread = true);
 
-                    // metrics(GetResult(), name);
-                    // if (((++count) % (letters.Size() / 5)) == 0) {
-                    //     std::cout << metrics().accuracy << " accuracy\n";
-                    //     metrics.Clear();
-                        
-                    // }
+        /**
+         * @brief Test the model using test data.
+         * @param letters DataManager dataset.
+         * @return Metrics object containing evaluation results.
+         */
+        Metrics Test(DataManager &letters);
 
-                    Backward(name);
-                    
-                });
-    
-                // if (k != epoch_count - 1) {
-                    MetricsMaker epoch_metrics;
-                    letters.ForTest([&] (data_vector &letter, int name) {
-                        letter_ = &letter;
-                        Forward();
-                        epoch_metrics(GetResult(), name);
-                    });
-                    const auto &m = epoch_metrics();
-                    std::cout << m.accuracy << "; ";
-                    for (auto i : m.precision) printf("%.3lf ", i);
-                    std::cout << '\n';
-                    letters.SetMetric(m.precision);
-                    UpdateLR();
-                // }
-            }
-            
-        }
-        virtual ~Model() = default;
-        Metrics Test(DataManager &letters) {
-            MetricsMaker metrics;
+        /**
+         * @brief Predict the letter for a given data vector.
+         * @param letter Data vector for prediction.
+         * @return Predicted letter as a char.
+         */
+        char Predict(data_vector &letter);
 
-            letters.ForTest([&] (data_vector &letter, int name) {
-                letter_ = &letter;
-                Forward();
-                metrics(GetResult(), name);
-            });
-            return metrics();
-        }
+        /**
+         * @brief virtual Forward function. Forward the letter through the model
+         * have to be implemented in the child class
+         */
         virtual void Forward() = 0;
+
+        /**
+         * @brief virtual Backward function. Backward the letter through the model
+         * have to be implemented in the child class
+         * @param answer int Answer. Correct class of the letter
+         */
         virtual void Backward(int answer) = 0;
+
+        /**
+         * @brief Virtual function to retrieve the model's result.
+         * @return Class prediction for the letter.
+         */
         virtual int GetResult() = 0;
-        virtual void UpdateLR() = 0;
+
+        /**
+         * @brief Virtual function to save the model to a file.
+         * @param filename File name for saving the model.
+         */
+        virtual void ToFile(const std::string &filename) = 0;
+
+        /**
+         * @brief Set a callback function for error reporting (if enabled).
+         * @param func Callback function taking mean error and epoch number.
+         */
+        void SetErrorThread(const std::function<void(fp_type, unsigned)> &func);
+
+        /**
+         * @brief Set a callback function for metric reporting (if enabled).
+         * @param func Callback function taking Metrics as an argument.
+         */
+        void SetMetricThread(const std::function<void(Metrics)> &func);
+
+        /**
+         * @brief Default virtual destructor
+         */
+        virtual ~Model() = default;
+
+        /**
+         * @brief Set the data vector for processing.
+         * @param letter Pointer to a data vector.
+         */
+
+        void SetLetter(data_vector *letter) {
+            letter_ = letter;
+        }
 
     protected:
+        /**
+         * @brief Pointer to the data vector currently being processed.
+         */
         data_vector *letter_;
+
+        /**
+         * @brief Settings for the Perceptron model.
+         */
+        PerceptronSettings settings_;
+
+        /**
+         * @brief Error information for the model.
+         */
+        Error error_;
+
+        /**
+         * @brief Callback function for reporting metrics.
+         * This function is called when metrics are available.
+         */
+        std::function<void(Metrics)> metrics_func_;
+
+        /**
+         * @brief This function must be overridden in derived classes.
+         * @return Mean error for the model.
+         */
+        virtual fp_type GetMeanError() = 0;
+
+        /**
+         * @brief Virtual method to update the learning rate every epoch (can be overridden).
+         * This method can be overridden in derived classes to implement custom
+         * learning rate update logic.
+         */
+        virtual void UpdateLR() {}
+
+    private:
+        void EpochTest(DataManager &letters, int64_t training_time);
 };
+
+
+/**
+ * @brief A template class for performing cross-validation with machine learning models.
+ *
+ * @tparam ModelType The type of the machine learning model to be used.
+ */
+template<class ModelType>
+struct CrossValidation {
+    /**
+     * @brief Run cross-validation on a dataset using the specified machine learning model.
+     *
+     * @param letters DataManager dataset.
+     * @param settings PerceptronSettings specifying model configuration.
+     * @param cross The number of cross-validation folds.
+     * @param epoch_count Number of training epochs for each fold.
+     * @param stop A flag to control the training loop.
+     * @param matrics_thread A callback function to handle metrics reporting.
+     * @param error_thread A callback function to handle error reporting.
+     */
+    static void Run(DataManager &letters, const PerceptronSettings &settings, unsigned int cross, unsigned int epoch_count, bool &stop,
+            std::function<void(Metrics&)> matrics_thread, std::function<void(fp_type, unsigned int)> error_thread);
+};
+
+
+template<class ModelType>
+void CrossValidation<ModelType>::Run(DataManager &letters, const PerceptronSettings &settings, unsigned int cross, unsigned int epoch_count, bool &stop,
+            std::function<void(Metrics&)> matrics_thread, std::function<void(fp_type, unsigned int)> error_thread) {
+    
+    // Validate dataset and perform cross-validation split
+    letters.Validate(settings.layers.front(), settings.layers.back());
+    letters.Split(cross);
+
+    for (unsigned int k = 0; k < cross; ++k) {
+        // Create a new model instance for each fold
+        ModelType model(settings);
+        model.SetErrorThread(error_thread);
+
+        // Train the model and perform testing
+        model.Train(letters, epoch_count, stop, true, false);
+        auto m = model.Test(letters);
+        matrics_thread(m);
+
+        // Update dataset for the next fold
+        letters.CrossUpdate();
+    }
+}
 
 } // namespace s21

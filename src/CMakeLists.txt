@@ -1,49 +1,33 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(mlp VERSION 0.1 LANGUAGES CXX)
+project(perceptron VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_COMPILER g++)
 
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets REQUIRED)
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets REQUIRED)
+# find cblas
+find_package(BLAS REQUIRED)
 
-set(PROJECT_SOURCES
-        main.cpp
-        qt/widget.cpp
-        qt/widget.h
-        qt/widget.ui
-        controller/controller.h
-        common/strategy.h
+# gcc flags optimization
+set(CMAKE_CXX_FLAGS "-O3 -march=native")
+
+set(SOURCE_DIRS
+    model
+    common
+    lib
 )
 
-if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
-    qt_add_executable(mlp
-        MANUAL_FINALIZATION
-        ${PROJECT_SOURCES}
+foreach(dir ${SOURCE_DIRS})
+    file(GLOB_RECURSE ONE_DIR_SOURCES 
+        ${dir}/*.cc
+        ${dir}/*.h
     )
-endif()
+    list(APPEND SOURCES ${ONE_DIR_SOURCES})
+endforeach()
 
-target_link_libraries(mlp PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+add_library(${PROJECT_NAME} STATIC ${SOURCES})
+target_link_libraries(${PROJECT_NAME} PUBLIC ${BLAS_LIBRARIES})
 
-target_include_directories(mlp PUBLIC controller)
-target_include_directories(mlp PUBLIC qt)
-target_include_directories(mlp PUBLIC common)
-
-set_target_properties(mlp PROPERTIES
-    MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com
-    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    MACOSX_BUNDLE TRUE
-    WIN32_EXECUTABLE TRUE
-)
-
-if(QT_VERSION_MAJOR EQUAL 6)
-    qt_finalize_executable(mlp)
-endif()

@@ -1,258 +1,580 @@
 #pragma once
 
-#include <iostream>
+#include <vector>
 #include <functional>
-#include <initializer_list>
-#include <random>
+#include <fstream>
+#include <algorithm>
+#include <iostream>
+
+namespace s21 {
+
+template<class T>
+class BLAS;
 
 template<class T>
 class Matrix {
-    T **matrix_;
-    int rows_, cols_;
-    void create(std::function<void(int, int)> func) {
-        matrix_ = new T *[rows_];
-        for (int k = 0; k < rows_; ++k) {
-            matrix_[k] = new T [cols_];
-            for (int g = 0; g < cols_; ++g) {
-                func(k, g);
+    public:
+        using i_type = unsigned int;
+        using base = std::vector<T>;
+        inline static double fp_compare_precision = 1e-6;
+
+        Matrix() = default;
+        Matrix(i_type rows, i_type cols, T value = T());
+        Matrix(i_type rows);
+        Matrix(i_type rows, i_type cols, const base &data);
+        Matrix(i_type rows, i_type cols, base &&data);
+        Matrix(i_type rows, i_type cols, std::ifstream &is);
+        Matrix(std::ifstream &is);
+        Matrix(const std::initializer_list<std::initializer_list<T>> &data);
+        Matrix(i_type rows, i_type cols, const std::function<T(void)> &func);
+        Matrix(i_type rows, i_type cols, const std::function<T(i_type, i_type)> &func);
+        Matrix(i_type rows, i_type cols, const std::function<void(T&)> &func);
+        Matrix(i_type rows, i_type cols, const std::function<void(i_type, i_type, T&)> &func);
+
+        Matrix(const Matrix &other) = default;
+        Matrix(Matrix &&other) = default;
+        Matrix &operator=(const Matrix &other) = default;
+        Matrix &operator=(Matrix &&other) = default;
+
+        T &operator()(i_type row, i_type col);
+        const T &operator()(i_type row, i_type col) const;
+        i_type GetRows() const;
+        i_type GetCols() const;
+        i_type GetRows();
+        i_type GetCols();
+
+        void Fill(T value);
+        void Fill(const base &data);
+        void Fill(base &&data);
+        void Fill(const std::initializer_list<std::initializer_list<T>> &data);
+        void Fill(const std::function<T(void)> &func);
+        void Fill(const std::function<T(i_type, i_type)> &func);
+        void Fill(const std::function<void(T&)> &func);
+        void Fill(const std::function<void(i_type, i_type, T&)> &func);
+
+        struct Row;
+        Row operator[](i_type row);
+        const Row operator[](i_type row) const;
+
+        static void Sum(const Matrix &a, const Matrix &b, Matrix &c);
+        static void Sum(const Matrix &a, T value, Matrix &c);
+        static void Sub(const Matrix &a, const Matrix &b, Matrix &c);
+        static void Mul(const Matrix &a, const Matrix &b, Matrix &c);
+        // c = a * b^T
+        static void MulBT(const Matrix &a, const Matrix &b, Matrix &c);
+
+        // Mul and MulBT functions where the input vector is treated as a matrix with one of its dimensions equal to 1, you can do so as follows:
+        static void Mul(const std::vector<T> &A, const Matrix<T> &B, std::vector<T> &C);
+        static void MulBT(const std::vector<T> &A, const Matrix<T> &B, std::vector<T> &C);
+        static void Mul(const Matrix &a, T value, Matrix &c);
+
+        Matrix &operator+=(const Matrix &other);
+        Matrix operator+(const Matrix &other) const;
+        Matrix &operator+=(T value);
+        Matrix operator+(T value) const;
+        Matrix &operator-=(const Matrix &other);
+        Matrix operator-(const Matrix &other) const;
+        Matrix &operator*=(const Matrix &other);
+        Matrix operator*(const Matrix &other) const;
+        Matrix &operator*=(const T &value);
+        Matrix operator*(const T &value) const;
+
+        bool operator==(const Matrix &other) const;
+        bool operator!=(const Matrix &other) const;
+
+        T *Data();
+        const T *Data() const;
+        base &DataVector();
+        const base &DataVector() const;
+
+        void Print(std::ostream &os = std::cout) const;
+        void PrintFull(std::ostream &os = std::cout) const;
+        void Read(std::istream &is = std::cin);
+        void ReadFull(std::istream &is = std::cin);
+
+        friend std::ostream &operator<<(std::ostream &os, const Matrix &matrix) {
+            matrix.Print(os);
+            return os;
+        }
+        friend std::istream &operator>>(std::istream &is, Matrix &matrix) {
+            matrix.Read(is);
+            return is;
+        }
+
+    private:
+        friend class BLAS<T>;
+        i_type rows_;
+        i_type cols_;
+        base data_;
+};
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, T value) :
+        rows_(rows), cols_(cols), data_(rows * cols, value) {}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows) :
+        rows_(rows), cols_(rows), data_(rows * rows, T()) {}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, const base &data) :
+        rows_(rows), cols_(cols), data_(data) {}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, base &&data) :
+        rows_(rows), cols_(cols), data_(data) {}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, std::ifstream &is) :
+        rows_(rows), cols_(cols), data_(rows * cols) {
+    for (auto &value : data_) {
+        is >> value;
+    }
+}
+
+template<class T>
+Matrix<T>::Matrix(std::ifstream &is) {
+    is >> rows_ >> cols_;
+    data_.resize(rows_ * cols_);
+    for (auto &value : data_) {
+        is >> value;
+    }
+}
+
+template<class T>
+Matrix<T>::Matrix(const std::initializer_list<std::initializer_list<T>> &data) :
+        rows_(data.size()), cols_(data.begin()->size()), data_(rows_ * cols_) {
+    i_type i = 0;
+    for (const auto &row : data) {
+        for (const auto &value : row) {
+            data_[i++] = value;
+        }
+    }
+}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, const std::function<T(void)> &func) :
+        rows_(rows), cols_(cols), data_(rows * cols) {
+
+    std::generate(data_.begin(), data_.end(), func);
+}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, const std::function<T(i_type, i_type)> &func) :
+        rows_(rows), cols_(cols), data_(rows * cols) {
+    for (i_type i = 0; i < rows_; ++i) {
+        for (i_type j = 0; j < cols_; ++j) {
+            data_[i * cols_ + j] = func(i, j);
+        }
+    }
+}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, const std::function<void(T&)> &func) :
+        rows_(rows), cols_(cols), data_(rows * cols) {
+    for (auto &value : data_) {
+        func(value);
+    }
+}
+
+template<class T>
+Matrix<T>::Matrix(i_type rows, i_type cols, const std::function<void(i_type, i_type, T&)> &func) :
+        rows_(rows), cols_(cols), data_(rows * cols) {
+    for (i_type i = 0; i < rows_; ++i) {
+        for (i_type j = 0; j < cols_; ++j) {
+            func(i, j, data_[i * cols_ + j]);
+        }
+    }
+}
+
+template<class T>
+T &Matrix<T>::operator()(i_type row, i_type col) {
+    return data_[row * cols_ + col];
+}
+
+template<class T>
+const T &Matrix<T>::operator()(i_type row, i_type col) const {
+    return data_[row * cols_ + col];
+}
+
+template<class T>
+typename Matrix<T>::i_type Matrix<T>::GetRows() const {
+    return rows_;
+}
+
+template<class T>
+typename Matrix<T>::i_type Matrix<T>::GetCols() const {
+    return cols_;
+}
+
+template<class T>
+typename Matrix<T>::i_type Matrix<T>::GetRows() {
+    return rows_;
+}
+
+template<class T>
+typename Matrix<T>::i_type Matrix<T>::GetCols() {
+    return cols_;
+}
+
+template<class T>
+void Matrix<T>::Fill(T value) {
+    std::fill(data_.begin(), data_.end(), value);
+}
+
+template<class T>
+void Matrix<T>::Fill(const base &data) {
+    data_ = data;
+}
+
+template<class T>
+void Matrix<T>::Fill(base &&data) {
+    data_ = data;
+}
+
+template<class T>
+void Matrix<T>::Fill(const std::initializer_list<std::initializer_list<T>> &data) {
+    rows_ = data.size();
+    cols_ = data.begin()->size();
+    data_.resize(rows_ * cols_);
+    i_type i = 0;
+    for (const auto &row : data) {
+        for (const auto &value : row) {
+            data_[i++] = value;
+        }
+    }
+}
+
+template<class T>
+void Matrix<T>::Fill(const std::function<T(void)> &func) {
+    std::generate(data_.begin(), data_.end(), func);
+}
+
+template<class T>
+void Matrix<T>::Fill(const std::function<T(i_type, i_type)> &func) {
+    for (i_type i = 0; i < rows_; ++i) {
+        for (i_type j = 0; j < cols_; ++j) {
+            data_[i * cols_ + j] = func(i, j);
+        }
+    }
+}
+
+template<class T>
+void Matrix<T>::Fill(const std::function<void(T&)> &func) {
+    for (auto &value : data_) {
+        func(value);
+    }
+}
+
+template<class T>
+void Matrix<T>::Fill(const std::function<void(i_type, i_type, T&)> &func) {
+    for (i_type i = 0; i < rows_; ++i) {
+        for (i_type j = 0; j < cols_; ++j) {
+            func(i, j, data_[i * cols_ + j]);
+        }
+    }
+}
+
+template<class T>
+struct Matrix<T>::Row {
+    Matrix &m;
+    i_type row;
+    Row(Matrix &matrix, i_type row) : m(matrix), row(row) {}
+    T &operator[](i_type col) {
+        return m(row, col);
+    }
+};
+
+template<class T>
+typename Matrix<T>::Row Matrix<T>::operator[](i_type row) {
+    return Row(*this, row);
+}
+
+template<class T>
+const typename Matrix<T>::Row Matrix<T>::operator[](i_type row) const {
+    return Row(*this, row);
+}
+
+template<class T>
+void Matrix<T>::Sum(const Matrix &a, const Matrix &b, Matrix &c) {
+    if (a.rows_ != b.rows_ || a.cols_ != b.cols_ || a.rows_ != c.rows_ || a.cols_ != c.cols_) {
+        throw std::runtime_error("Matrix::Sum: different sizes");
+    }
+    const T *a_data = a.Data();
+    const T *b_data = b.Data();
+    T *c_data = c.Data();
+    for (i_type i = 0; i < a.rows_; ++i) {
+        for (i_type j = 0; j < a.cols_; ++j) {
+            c_data[i * a.cols_ + j] = a_data[i * a.cols_ + j] + b_data[i * a.cols_ + j];
+        }
+    }
+}
+
+template<class T>
+void Matrix<T>::Sum(const Matrix &a, T value, Matrix &c) {
+    if (a.rows_ != c.rows_ || a.cols_ != c.cols_) {
+        throw std::runtime_error("Matrix::Sum: different sizes");
+    }
+    const T *a_data = a.Data();
+    T *c_data = c.Data();
+    for (i_type i = 0; i < a.rows_; ++i) {
+        for (i_type j = 0; j < a.cols_; ++j) {
+            c_data[i * a.cols_ + j] = a_data[i * a.cols_ + j] + value;
+        }
+    }
+}
+
+template<class T>
+void Matrix<T>::Sub(const Matrix &a, const Matrix &b, Matrix &c) {
+    if (a.rows_ != b.rows_ || a.cols_ != b.cols_ || a.rows_ != c.rows_ || a.cols_ != c.cols_) {
+        throw std::runtime_error("Matrix::Sub: different sizes");
+    }
+    const T *a_data = a.Data();
+    const T *b_data = b.Data();
+    T *c_data = c.Data();
+    for (i_type i = 0; i < a.rows_; ++i) {
+        for (i_type j = 0; j < a.cols_; ++j) {
+            c_data[i * a.cols_ + j] = a_data[i * a.cols_ + j] - b_data[i * a.cols_ + j];
+        }
+    }
+}
+
+template<class T>
+void Matrix<T>::Mul(const std::vector<T> &A, const Matrix<T> &B, std::vector<T> &C) {
+    if (A.size() != B.rows_ || B.cols_ != C.size()) {
+        throw std::runtime_error("Mul: incompatible sizes");
+    }
+    
+    const T *b_data = B.Data();
+    T *c_data = C.data();
+    
+    for (i_type j = 0; j < B.cols_; ++j) {
+        T sum = 0;
+        for (i_type i = 0; i < A.size(); ++i) {
+            sum += A[i] * b_data[i * B.cols_ + j];
+        }
+        c_data[j] = sum;
+    }
+}
+
+template<class T>
+void Matrix<T>::MulBT(const std::vector<T> &A, const Matrix<T> &B, std::vector<T> &C) {
+    if (A.size() != B.cols_ || B.rows_ != C.size()) {
+        throw std::runtime_error("MulBT: incompatible sizes");
+    }
+    
+    const T *b_data = B.Data();
+    T *c_data = C.data();
+    
+    for (i_type j = 0; j < B.rows_; ++j) {
+        T sum = 0;
+        for (i_type i = 0; i < A.size(); ++i) {
+            sum += A[i] * b_data[j * B.cols_ + i];
+        }
+        c_data[j] = sum;
+    }
+}
+
+
+
+template<class T>
+void Matrix<T>::Mul(const Matrix &a, const Matrix &b, Matrix &c) {
+    if (a.cols_ != b.rows_ || a.rows_ != c.rows_ || b.cols_ != c.cols_) {
+        throw std::runtime_error("Matrix::Mul: different sizes");
+    }
+    const T *a_data = a.Data();
+    const T *b_data = b.Data();
+    T *c_data = c.Data();
+    for (i_type i = 0; i < a.rows_; ++i) {
+        for (i_type j = 0; j < b.cols_; ++j) {
+            T sum = 0;
+            for (i_type k = 0; k < a.cols_; ++k) {
+                sum += a_data[i * a.cols_ + k] * b_data[k * b.cols_ + j];
+            }
+            c_data[i * b.cols_ + j] = sum;
+        }
+    }
+}
+
+template<class T>
+void Matrix<T>::MulBT(const Matrix &a, const Matrix &b, Matrix &c) {
+    if (a.cols_ != b.cols_ || a.rows_ != c.rows_ || b.rows_ != c.cols_) {
+        throw std::runtime_error("Matrix::MulBT: incompatible sizes");
+    }
+    const T *a_data = a.Data();
+    const T *b_data = b.Data();
+    T *c_data = c.Data();
+    for (i_type i = 0; i < a.rows_; ++i) {
+        for (i_type j = 0; j < b.rows_; ++j) {
+            T sum = 0;
+            for (i_type k = 0; k < a.cols_; ++k) {
+                sum += a_data[i * a.cols_ + k] * b_data[j * b.cols_ + k];
+            }
+            c_data[i * b.rows_ + j] = sum;
+        }
+    }
+}
+
+template<class T>
+void Matrix<T>::Mul(const Matrix &a, T value, Matrix &c) {
+    if (a.rows_ != c.rows_ || a.cols_ != c.cols_) {
+        throw std::runtime_error("Matrix::Mul: different sizes");
+    }
+    T *a_data = a.Data();
+    T *c_data = c.Data();
+    for (i_type i = 0; i < a.rows_; ++i) {
+        for (i_type j = 0; j < a.cols_; ++j) {
+            c_data[i * a.cols_ + j] = a_data[i * a.cols_ + j] * value;
+        }
+    }
+}
+
+
+
+template<class T>
+Matrix<T> &Matrix<T>::operator+=(const Matrix &other) {
+    Sum(*this, other, *this);
+    return *this;
+}
+
+template<class T>
+Matrix<T> Matrix<T>::operator+(const Matrix &other) const {
+    Matrix result(rows_, cols_);
+    Sum(*this, other, result);
+    return result;
+}
+
+template<class T>
+Matrix<T> &Matrix<T>::operator+=(T value) {
+    Sum(*this, value, *this);
+    return *this;
+}
+
+template<class T>
+Matrix<T> Matrix<T>::operator+(T value) const {
+    Matrix result(rows_, cols_);
+    Sum(*this, value, result);
+    return result;
+}
+
+template<class T>
+Matrix<T> &Matrix<T>::operator-=(const Matrix &other) {
+    Sum(*this, other * -1, *this);
+    return *this;
+}
+
+template<class T>
+Matrix<T> Matrix<T>::operator-(const Matrix &other) const {
+    Matrix result(rows_, cols_);
+    Sum(*this, other * -1, result);
+    return result;
+}
+
+template<class T>
+Matrix<T> &Matrix<T>::operator*=(const Matrix &other) {
+    Mul(*this, other, *this);
+    return *this;
+}
+
+template<class T>
+Matrix<T> Matrix<T>::operator*(const Matrix &other) const {
+    Matrix result(rows_, other.cols_);
+    Mul(*this, other, result);
+    return result;
+}
+
+template<class T>
+Matrix<T> &Matrix<T>::operator*=(const T &value) {
+    Mul(*this, value, *this);
+    return *this;
+}
+
+template<class T>
+Matrix<T> Matrix<T>::operator*(const T &value) const {
+    Matrix result(rows_, cols_);
+    Mul(*this, value, result);
+    return result;
+}
+
+template<class T>
+bool Matrix<T>::operator==(const Matrix &other) const {
+    if (rows_ != other.rows_ || cols_ != other.cols_) {
+        return false;
+    }
+    if constexpr (std::is_floating_point_v<T>) {
+        for (i_type i = 0; i < rows_; ++i) {
+            for (i_type j = 0; j < cols_; ++j) {
+                if (std::abs(data_[cols_ * i + j] - other.data_[cols_ * i + j]) > fp_compare_precision) {
+                    return false;
+                }
+            }
+        }
+    } else {
+        for (i_type i = 0; i < rows_; ++i) {
+            for (i_type j = 0; j < cols_; ++j) {
+                if (data_[cols_ * i + j] != other.data_[cols_ * i + j]) {
+                    return false;
+                }
             }
         }
     }
+    return true;
+}
 
-    public:
-        Matrix() noexcept : rows_(0), cols_(0) {}
-        Matrix(int rows, int cols) : rows_(rows), cols_(cols) {
-            matrix_ = new T *[rows_];
-            for (int k = 0; k < rows_; ++k) {
-                matrix_[k] = new T [cols_];
-            }
+template<class T>
+bool Matrix<T>::operator!=(const Matrix &other) const {
+    return !(*this == other);
+}
+
+template<class T>
+void Matrix<T>::Print(std::ostream &os) const {
+    for (i_type i = 0; i < rows_; ++i) {
+        for (i_type j = 0; j < cols_; ++j) {
+            os << data_[i * cols_ + j] << '\t';
         }
-        Matrix(int rows, int cols, const T value) : rows_(rows), cols_(cols) {
-            create([&] (int k, int g) { matrix_[k][g] = value; });
-        }
-        Matrix(int rows, int cols, std::function<const T(void)> value_func) : rows_(rows), cols_(cols) {
-            create([&] (int k, int g) { matrix_[k][g] = value_func(); });
-        }
-        Matrix(int rows, int cols, std::function<void(T&)> value_func) : rows_(rows), cols_(cols) {
-            create([&] (int k, int g) { value_func(matrix_[k][g]); });
-        }
-        Matrix(int rows, int cols, std::function<void(T&, int, int)> value_func) : rows_(rows), cols_(cols) {
-            create([&] (int k, int g) { value_func(matrix_[k][g], k, g); });
-        }
-        Matrix(int rows, int cols, T mean, T sd) : rows_(rows), cols_(cols) { // only for float, double, long double
-            std::mt19937 generator{std::random_device{}()};
-            std::normal_distribution<T> distribution{mean, sd};
-            create([&] (int k, int g) { matrix_[k][g] = distribution(generator); });
-        }
-        Matrix(const Matrix &other) : rows_(other.rows_), cols_(other.cols_) {
-            create([&] (int k, int g) { matrix_[k][g] = other(k, g); });
-        }
-        Matrix(Matrix &&other) noexcept : rows_(other.rows_), cols_(other.cols_), matrix_(other.matrix_) {
-            other.matrix_ = nullptr;
-            other.rows_ = 0;
-            other.cols_ = 0;
-        }
-        void Loop(std::function<void(int, int)> func) {
-            for (int k = 0; k < rows_; ++k) {
-                for (int g = 0; g < cols_; ++g) {
-                    func(k, g);
-                }
-            }
-        }
-        Matrix& operator=(const Matrix& other) {
-            if (this != &other) {
-                Matrix temp(other);
-                std::swap(rows_, temp.rows_);
-                std::swap(cols_, temp.cols_);
-                std::swap(matrix_, temp.matrix_);
-            }
-            return *this;
-        }
-        Matrix& operator=(Matrix&& other) noexcept {
-            std::swap(rows_, other.rows_);
-            std::swap(cols_, other.cols_);
-            std::swap(matrix_, other.matrix_);
-            return *this;
-        }
-        void Clear() {
-            if (cols_ > 0) {
-                for (int k = 0; k < rows_; ++k) {
-                    delete[] matrix_[k];
-                }
-            }
-            if (rows_ > 0) delete[] matrix_;
-            cols_ = 0;
-            rows_ = 0;
-        }
-        ~Matrix() {
-            Clear();
-        }
-        Matrix(std::initializer_list<std::initializer_list<T>> const &items) : rows_(items.size()), cols_(items.begin()->size()) {
-            int k = 0;
-            matrix_ = new T *[rows_];
-            for (auto const &row : items) {
-                int g = 0;
-                matrix_[k] = new T [cols_];
-                for (auto const &cell : row) {
-                    matrix_[k][g++] = cell;
-                }
-                ++k;
-            }
-        }
-        void ForEach(std::function<void(const T&)> func) const {
-            loop([&] (int k, int g) { func(matrix_[k][g]); });
-        }
-        void Fill(std::function<void(T&)> func) {
-            loop([&] (int k, int g) { func(matrix_[k][g]); });
-        }
-        T &operator()(int row, int col) {
-            return matrix_[row][col];
-        }
-        const T &operator()(int row, int col) const {
-            return matrix_[row][col];
-        }
-        const T &Get(int row, int col) const {
-            return matrix_[row][col];
-        }
-        void Set(int row, int col, T value) {
-            if (row >= rows_ || row < 0 || col >= cols_ || col < 0) {
-                throw std::invalid_argument("Matrix: Set error");
-            }
-            matrix_[row][col] = value;
-        }
-        int GetRows() const {
-            return rows_;
-        }
-        // T *GetRow(int row) const {
-        //     return matrix_[row];
-        // }
-        int GetCols() const {
-            return cols_;
-        }
-        Matrix operator*(const T num) const {
-            return Matrix(rows_, cols_, [&] (T &cell, int k, int g) { cell = matrix_[k][g] * num; });
-        }
-        void operator*=(const T num) {
-            loop([&] (int k, int g) { matrix_[k][g] *= num; });
-        }
-        Matrix operator*(Matrix &other) const {
-            if (cols_ != other.rows_) {
-                throw std::invalid_argument("Matrix: Mul error");
-            }
-            return Matrix(rows_, other.cols_, [&] (T &cell, int k, int g) {
-                cell = 0;
-                for (int i = 0; i < cols_; ++i) {
-                    cell += matrix_[k][i] * other(i, g);
-                }
-            });
-        }
-        void operator*=(Matrix &other) {
-            auto temp = *this;
-            *this = temp * other;
-        }
-        Matrix operator+(Matrix &other) const {
-            if (rows_ != other.rows_ || cols_ != other.cols_) {
-                throw std::invalid_argument("Matrix: Sum error");
-            }
-            return Matrix(rows_, cols_, [&] (T &cell, int k, int g) {
-                cell = matrix_[k][g] + other(k, g);
-            });
-        }
-        void operator+=(Matrix &other) {
-            if (rows_ != other.rows_ || cols_ != other.cols_) {
-                throw std::invalid_argument("Matrix: Sum error");
-            }
-            Loop([&] (int k, int g) { matrix_[k][g] += other(k, g); });
-        }
-        void operator+=(const Matrix &other) {
-            if (rows_ != other.rows_ || cols_ != other.cols_) {
-                throw std::invalid_argument("Matrix: Sum error");
-            }
-            Loop([&] (int k, int g) { matrix_[k][g] += other(k, g); });
-        }
-        Matrix operator-(Matrix &other) const {
-            if (rows_ != other.rows_ || cols_ != other.cols_) {
-                throw std::invalid_argument("Matrix: Sum error");
-            }
-            return Matrix(rows_, cols_, [&] (T &cell, int k, int g) {
-                cell = matrix_[k][g] - other(k, g);
-            });
-        }
-        void operator-=(Matrix &other) {
-            if (rows_ != other.rows_ || cols_ != other.cols_) {
-                throw std::invalid_argument("Matrix: Sum error");
-            }
-            Loop([&] (int k, int g) { matrix_[k][g] -= other(k, g); });
-        }
-        void operator-=(const Matrix &other) {
-            if (rows_ != other.rows_ || cols_ != other.cols_) {
-                throw std::invalid_argument("Matrix: Sum error");
-            }
-            Loop([&] (int k, int g) { matrix_[k][g] -= other(k, g); });
-        }
-        Matrix Transpose() const {
-            return Matrix(cols_, rows_, [&] (T &cell, int k, int g) {
-                cell = matrix_[g][k];
-            });
-        }
-        void TransposeThis() {
-            auto temp = *this;
-            *this = temp.Transpose();
-        }
-        bool operator==(const Matrix &other) const {
-            if (cols_ != other.cols_ || rows_ != other.rows_) return false;
-            for (int k = 0; k < rows_; ++k) {
-                for (int g = 0; g < cols_; ++g) {
-                    if (other(k, g) != matrix_[k][g]) {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        }
-        bool operator!=(Matrix &other) {
-            return !operator==(other);
-        }
-        T Determinant() {
-            if (rows_ != cols_) {
-                throw std::invalid_argument("Matrix: Determinant error");
-            }
-            return determinant();
-        }
-        Matrix Minor(int row, int col) {
-            Matrix res(rows_ - 1, cols_ - 1);
-            int i = 0, j;
-            for (int k = 0; k < rows_; k++) {
-                j = 0;
-                if (k == row) continue;
-                for (int g = 0; g < cols_; g++) {
-                if (g != col) {
-                    res.matrix_[i][j] = matrix_[k][g];
-                    j++;
-                }
-                }
-                i++;
-            }
-            return res;
-        }
-        void Print() const {
-            for (int k = 0; k < rows_; ++k) {
-                for (int g = 0; g < cols_; ++g) {
-                    std::cout << matrix_[k][g] << " ";
-                }
-                std::cout << "\n";
-            }
-        }
-    private:
-        T determinant() {
-            T res = 0;
-            if (rows_ == 1) {
-                res = matrix_[0][0];
-            } else {
-                for (int k = 0; k < cols_; k++) {
-                    res += Minor(0, k).Determinant() * matrix_[0][k] * (k % 2 ? -1 : 1);
-                }
-            }
-            return res;
-        }
-};
+        os << '\n';
+    }
+}
+
+template<class T>
+void Matrix<T>::PrintFull(std::ostream &os) const {
+    os << rows_ << '\t' << cols_ << '\n';
+    Print(os);
+}
+
+template<class T>
+void Matrix<T>::Read(std::istream &is) {
+    for (auto &value : data_) {
+        is >> value;
+    }
+}
+
+template<class T>
+void Matrix<T>::ReadFull(std::istream &is) {
+    is >> rows_ >> cols_;
+    data_.resize(rows_ * cols_);
+    Read(is);
+}
+
+
+template<class T>
+T *Matrix<T>::Data() {
+    return data_.data();
+}
+
+template<class T>
+const T *Matrix<T>::Data() const {
+    return data_.data();
+}
+
+template<class T>
+typename Matrix<T>::base &Matrix<T>::DataVector() {
+    return data_;
+}
+
+template<class T>
+const typename Matrix<T>::base &Matrix<T>::DataVector() const {
+    return data_;
+}
+
+} // namespace s21

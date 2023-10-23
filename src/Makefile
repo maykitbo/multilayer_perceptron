@@ -1,17 +1,27 @@
-# -lOpenCL -lclBLAS
+.PHONY: all perceptron_static_lib ex_1 ex_2 dvi clean
 
-all: clean
-	g++ main.cc lib/m_thread.cc common/metrics.cc -lpthread -lm -ldl -lblas -Ofast -march=native
-	./a.out
 
-qt:
-	cmake -B"build"
-	$(MAKE) -C build
-	mv build/mlp mlp
-	./mlp
+perceptron_static_lib:
+	cmake -B build
+	make -C build
+
+
+ex_1: perceptron_static_lib
+	g++ -o ex_1 experiments/ex_1.cc -Lbuild -lperceptron -lblas -std=c++17
+	./ex_1
+
+ex_2: perceptron_static_lib
+	g++ -o ex_1 experiments/ex_1.cc -Lbuild -lperceptron -lblas -std=c++17
+	./ex_2
+
+dvi:
+	mkdir -p documentation
+	@doxygen Doxyfile && mv html documentation && mv latex documentation
+	@open documentation/html/index.html
 
 clean:
-	rm -rf a.out
-	rm -rf build/*
-	rm -rf mlp
-	rm -rf ../build-*
+	rm -rf build
+	rm -rf documentation
+	rm -rf ex_*
+
+
