@@ -1,0 +1,97 @@
+PerceptronSettings {
+	layers [784, 96, 64, 48, 32, 29, 26]
+	learning rate 0.0005
+	activation function 1
+	weight init function 1
+	weight mean 0
+	weight sd 1
+	momentum 0.2
+	lr epoch k 0.98
+	lr layers k 0.99
+}
+Time = 30882
+6 64
+1 0.191789
+1 0.182398
+1 0.161737
+1 0.144752
+1 0.134825
+1 0.126715
+1 0.119115
+1 0.113597
+1 0.11149
+2 0.100738
+2 0.0992093
+2 0.0967977
+2 0.10095
+2 0.10501
+2 nan
+2 nan
+2 -nan
+2 nan
+3 -nan
+3 -nan
+3 nan
+3 -nan
+3 nan
+3 -nan
+3 nan
+3 -nan
+3 nan
+4 -nan
+4 -nan
+4 nan
+4 -nan
+4 nan
+4 -nan
+4 nan
+4 -nan
+4 nan
+5 -nan
+5 -nan
+5 nan
+5 -nan
+5 nan
+5 -nan
+5 nan
+5 -nan
+5 nan
+6 -nan
+6 -nan
+6 nan
+6 -nan
+6 nan
+6 -nan
+6 nan
+6 -nan
+6 nan
+
+
+0.651239
+0.0362613
+0.0362613
+0.0362613
+0.0362613
+0.0362613
+0.538874 0.790262 0.795252 0.64042 0.8327 0.626866 0.492537 0.623472 0.375758 0.452978 0.657143 0.389127 0.879365 0.635036 0.773333 0.854369 0.524345 0.601173 0.860082 0.528369 0.74359 0.794979 0.784741 0.818482 0.701183 0.708642 
+0.0362613 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0362613 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0362613 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0362613 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0362613 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+
+
+0.624224 0.581267 0.761364 0.652406 0.659639 0.773006 0.489614 0.724432 0.182891 0.832853 0.567901 0.85 0.798271 0.557692 0.803324 0.739496 0.421687 0.563187 0.620178 0.412742 0.652733 0.557185 0.847059 0.740299 0.684971 0.824713 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+
+0.578417 0.669841 0.777939 0.646358 0.736134 0.692308 0.491071 0.670171 0.246032 0.586802 0.609272 0.533857 0.836858 0.593857 0.788043 0.792793 0.467446 0.58156 0.72069 0.463453 0.695205 0.655172 0.81471 0.777429 0.692982 0.762284 
+0.0699848 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0699848 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0699848 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0699848 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0699848 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 

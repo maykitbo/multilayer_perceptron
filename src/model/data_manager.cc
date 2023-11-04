@@ -12,7 +12,8 @@ void DataManager::ReadNoRotate(std::fstream &file, data_vector &letter)
             throw std::runtime_error("DataManager: incorrect file");
         }
         file >> i;
-        i /= 256.0;
+        i = (i / (255.0 / 2.0)) - 1.0;
+        // i = i / 255.0;
         file.ignore();
     }
 }
@@ -28,8 +29,11 @@ void DataManager::Read90Rotate(std::fstream &file, data_vector &letter)
                 file.close();
                 throw std::runtime_error("DataManager: incorrect file");
             }
-            file >> letter[g * height_ + k];
-            letter[g * height_ + k] /= 256.0;
+            fp_type temp;
+            file >> temp;
+            temp = (temp / (255.0 / 2.0)) - 1.0;
+            // temp = temp / 255.0;
+            letter[g * height_ + k] = temp;
             file.ignore();
         }
     }
@@ -49,10 +53,10 @@ auto DataManager::ReadFunctionSwitch(LetterRotate rotate)
 
 DataManager::DataManager(const std::string &file_path, int bias, LetterRotate rotate,
                         size_t width, size_t height, unsigned classes)
-    : letters_(classes)
-    , width_(width)
+    : width_(width)
     , height_(height)
     , classes_(classes)
+    , test_proportion_(0.0)
 {
     
     std::fstream file(file_path);
@@ -72,8 +76,8 @@ DataManager::DataManager(const std::string &file_path, int bias, LetterRotate ro
             break;
 
         file.ignore();
-        letters_[name].emplace_back(len);
-        (this->*read_func)(file, letters_[name].back());
+        letters_.emplace_back(std::vector<fp_type>(len), name);
+        (this->*read_func)(file, letters_.back().first);
         ++size_;
     }
 
@@ -82,47 +86,27 @@ DataManager::DataManager(const std::string &file_path, int bias, LetterRotate ro
     if (size_ == 0)
         throw std::runtime_error("DataManager: empty file");
 
+    Shuffle();
     Split(Const::default_train_proportion);
 
 }
 
-void DataManager::ForTest(const std::function<void(data_vector&, int)> func)
+void DataManager::ForTest(const std::function<void(data_t&)> func)
 {
-    for (unsigned name = 0; name < classes_; ++name)
+    for (auto iter = letters_.end() - size_ * test_proportion_; iter != letters_.end(); ++iter)
     {
-        for (auto iter = letters_[name].end() - letters_[name].size() * test_proportion_;
-            iter != letters_[name].end();
-            ++iter)
-        {
-            func(*iter, name);
-        }
+        func(*iter);
     }
+    
 }
 
-void DataManager::ForTrain(const std::function<void(data_vector&, int)> func)
+void DataManager::ForTrain(const std::function<void(data_t&)> func, int batch)
 {
-    std::vector<bool> trained(classes_, false);
-
-    for (int k = 0; k < size_ * train_proportion_; ++k)
+    Shuffle();
+    int n = ((int)(size_ * train_proportion_) / batch) * batch;
+    for (int k = 0; k < n; ++k)
     {
-        fp_type selection = s21::Random::Uniform<fp_type>(0.0, metric_sum_);
-        for (unsigned name = 0; name < classes_; ++name)
-        {
-            selection -= metric_[name];
-            if (selection <= 0.0)
-            {
-                trained[name] = true;
-                func(letters_[name][Random::Int<int>(0, letters_[name].size() * train_proportion_)], name);
-                break;
-            }
-        }
-    }
-    for (unsigned name = 0; name < classes_; ++name)
-    {
-        if (!trained[name])
-        {
-            func(letters_[name][Random::Int<int>(0, letters_[name].size() * train_proportion_)], name);
-        }
+        func(letters_[k]);
     }
 }
 
@@ -131,28 +115,16 @@ void DataManager::Split(unsigned proportion)
     if (proportion == 0)
         throw std::runtime_error("DataManager: proportion == 0");
 
-    metric_ = std::vector<fp_type>(classes_, 1.0);
-    metric_sum_ = classes_;
     test_proportion_ = 1.0 / (fp_type)proportion;
     train_proportion_ = 1.0 - test_proportion_;
     cross_k_ = proportion - 1;
 }
 
-// void DataManager::SetMetric(const std::vector<fp_type> &metric) {
-//     metric_sum_ = 0.0;
-//     for (unsigned int k = 0; k < classes_; ++k) {
-//         metric_[k] = 1.0 / metric[k];
-//         metric_sum_ += metric_[k];
-//     }
-// }
-
 void DataManager::Shuffle()
 {
-    for (auto iter = letters_.begin(); iter != letters_.end(); ++iter)
-    {
-        std::shuffle(iter->begin(), iter->end(),
-            std::default_random_engine(std::random_device{}()));
-    }
+    std::shuffle(letters_.begin(), letters_.end() - size_ * test_proportion_,
+        std::default_random_engine(std::random_device{}()));
+
 }
 
 void DataManager::CrossUpdate()
@@ -162,12 +134,7 @@ void DataManager::CrossUpdate()
         std::cerr << "cros_k == 0\n";
         return;
     }
-    for (unsigned name = 0; name < classes_; ++name)
-    {
-        int end = cross_k_ * letters_[name].size() * test_proportion_;
-        int start = (cross_k_ - 1) * letters_[name].size() * test_proportion_;
-        std::rotate(letters_[name].begin() + start, letters_[name].begin() + end, letters_[name].end());
-    }
+    std::rotate(letters_.begin(), letters_.end() - size_ * test_proportion_, letters_.end());
     --cross_k_;
 }
 
@@ -177,10 +144,52 @@ void DataManager::Validate(size_t letter_size, unsigned classes)
         throw std::runtime_error("Validation failed: letter size or classes do not match expectations.");
 }
 
-void DataManager::PrintLetter(const data_vector &one)
+void DataManager::IncreaseRoatation(int angle)
 {
-    auto iter = one.begin();
-    int s = std::sqrt(one.size());
+    letters_.resize(size_ * 3);
+    for (unsigned k = 0; k < size_; ++k)
+    {
+        letters_[size_ * 2 + k] = letters_[k];
+        letters_[size_ + k].first = Rotate(letters_[k].first, -angle);
+        letters_[k].first = Rotate(letters_[k].first, angle);
+    }
+    size_ *= 3;
+    Shuffle();
+}
+
+std::vector<fp_type> DataManager::Rotate(const std::vector<fp_type> &source, int angle)
+{
+    double radians = angle * M_PI / 180.0;
+    double cos_t = cos(radians);
+    double sin_t = sin(radians);
+
+    int size = sqrt(source.size());
+    int cx = size / 2;
+    int cy = size / 2;
+
+    std::vector<double> rotated(size * size, 0.0);
+
+    for (int y = 0; y < size; ++y) {
+        for (int x = 0; x < size; ++x) {
+            int rx = static_cast<int>((x - cx) * cos_t - (y - cy) * sin_t + cx);
+            int ry = static_cast<int>((x - cx) * sin_t + (y - cy) * cos_t + cy);
+
+            if (rx >= 0 && rx < size && ry >= 0 && ry < size) {
+                rotated[y * size + x] = source[ry * size + rx];
+            }
+        }
+    }
+
+    return rotated;
+}
+
+
+
+void DataManager::PrintLetter(const data_t &one)
+{
+    std::cout << one.second << '\n';
+    auto iter = one.first.begin();
+    int s = std::sqrt(one.first.size());
     for (int k = s - 1; k != -1; --k)
     {
         for (int g = 0; g < s; ++g)
@@ -199,13 +208,13 @@ void DataManager::PrintLetter(const data_vector &one)
 
 void DataManager::Printn(int n)
 {
-    for (int k = 0; k < n; ++k)
-    {
-        int l = Random::Int<int>(0, 25);
-        std::cout << (char)('a' + l) << '\n';
-        PrintLetter(letters_[l][Random::Int<int>(0, letters_[l].size() - 1)]);
-        std::cout << '\n';
-    }
+    // for (int k = 0; k < n; ++k)
+    // {
+    //     int l = Random::Int<int>(0, 25);
+    //     std::cout << (char)('a' + l) << '\n';
+    //     PrintLetter(letters_[l][Random::Int<int>(0, letters_[l].size() - 1)]);
+    //     std::cout << '\n';
+    // }
 }
 
 

@@ -2,13 +2,13 @@
 
 using namespace s21;
 
-void Model::Train(DataManager &letters, unsigned epoch_count, unsigned batch,
+void Model::Train(DataManager &inputs, unsigned epoch_count, unsigned batch,
         bool &stop, bool error_thread, bool metric_thread)
 {
 
-    letters.Validate(settings_.layers.front(), settings_.layers.back());
+    inputs.Validate(settings_.layers.front(), settings_.layers.back());
     if (error_thread)
-        error_.SetDatasetSize(letters.TrainSize());
+        error_.SetDatasetSize(inputs.TrainSize());
 
     auto time_point = std::chrono::high_resolution_clock::now();
     unsigned batch_count = 0;
@@ -17,24 +17,27 @@ void Model::Train(DataManager &letters, unsigned epoch_count, unsigned batch,
         if (error_thread)
             error_.SetEpoch(k + 1);
 
-        letters.ForTrain([&] (data_vector &letter, int name)
+        inputs.ForTrain([&] (data_t &input)
         {
             if (stop)
                 return;
             
-            letter_ = &letter;
-            Forward();
-            if (++batch_count == batch)
-            {
-                Backward(name);
-                batch_count = 0;
-            }
-            // Backward(name);
+            Forward(input.first);
+            Backward(input);
             if (error_thread)
                 error_.Collect(GetMeanError());
-        });
+
+            if (++batch_count == batch)
+            {
+                UpdateWeights();
+                batch_count = 0;
+            }
+        }, batch);
+        if (stop)
+            return;
+
         if (metric_thread)
-            EpochTest(letters, Time::Duration<Time::ms>(time_point));
+            EpochTest(inputs, Time::Duration<Time::ms>(time_point));
 
         UpdateLR();
     }
@@ -42,28 +45,28 @@ void Model::Train(DataManager &letters, unsigned epoch_count, unsigned batch,
     
 }
 
-Metrics Model::Test(DataManager &letters)
+Metrics Model::Test(DataManager &inputs)
 {
     auto time_point = std::chrono::high_resolution_clock::now();
 
-    letters.Validate(settings_.layers.front(), settings_.layers.back());
+    inputs.Validate(settings_.layers.front(), settings_.layers.back());
 
     MetricsMaker metrics(settings_.layers.back());
 
-    letters.ForTest([&] (data_vector &letter, int name)
+    inputs.ForTest([&] (data_t &input)
     {
-        letter_ = &letter;
-        Forward();
-        metrics(GetResult(), name);
+        // letter_ = &letter.first;
+        Forward(input.first);
+        metrics(GetResult(), input.second);
     });
     auto metr = metrics();
     metr.testing_time = Time::Duration<Time::ms>(time_point);
     return metr;
 }
 
-void Model::EpochTest(DataManager &letters, int64_t training_time)
+void Model::EpochTest(DataManager &inputs, int64_t training_time)
 {
-    auto epoch_metrics = Test(letters);
+    auto epoch_metrics = Test(inputs);
 
     epoch_metrics.training_time = training_time;
     epoch_metrics.testing_time = epoch_metrics.testing_time;
@@ -71,13 +74,13 @@ void Model::EpochTest(DataManager &letters, int64_t training_time)
     metrics_func_(epoch_metrics);
 }
 
-char Model::Predict(data_vector &letter)
+char Model::Predict(data_vector &input)
 {
-    if (letter.size() != settings_.layers.front())
+    if (input.size() != settings_.layers.front())
         throw std::runtime_error("Model: incorrect letter size");
 
-    letter_ = &letter;
-    Forward();
+    // letter_ = &letter;
+    Forward(input);
     return GetResult() + 'A';
 }
 

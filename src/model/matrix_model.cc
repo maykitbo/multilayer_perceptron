@@ -7,22 +7,27 @@ using namespace s21;
 
 MatrixLayer::MatrixLayer(size_t rows, size_t cols, fp_type lr, const PerceptronSettings &settings)
     : weights_(rows, cols, [&] { return settings.weight_init(rows, cols); })
-    , delta_weights_(rows, cols, 0)
+    , delta_weights_(rows, cols, 0.0)
     , biases_(cols)
     , destination_(cols)
     , gradients_(cols)
-    , error_(cols)
+    , gradients_sum_(cols)
+    , gradients_matrix_(rows, cols, 0.0)
     , settings_(settings)
     , learning_rate_(lr)
+    // , adam_cache_(weights_)
+    , adam_cache_(rows, cols, 0.0)
+    , adam_m_(rows, cols, 0.0)
+    , adam_v_(rows, cols, 0.0)
+    , delta_biases_(cols, 0.0)
 {}
-
 
 MatrixModel::MatrixModel(const PerceptronSettings &settings)
 {
     settings.Validate();
     settings_ = settings;
     fp_type lr = settings_.learning_rate;
-    for (unsigned int k = 0; k < settings_.layers.size() - 1; ++k)
+    for (unsigned k = 0; k < settings_.layers.size() - 1; ++k)
     {
         layers_.emplace_back(settings_.layers[k], settings_.layers[k + 1], lr, settings_);
         lr *= settings_.lr_layers_k;
@@ -32,113 +37,242 @@ MatrixModel::MatrixModel(const PerceptronSettings &settings)
 /////////////////////////////////////////////////////////////////////////
 // FORWARD
 
-void MatrixLayer::Signal(const std::vector<fp_type> *source)
+void MatrixLayer::Signal(const std::vector<fp_type> &source)
 {
     // destination_ = source * weights_ + biases_
-    // matrix_t::Mul(*source, weights_, destination_);
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-        1, weights_.GetCols(), source->size(), 1.0,
-        source->data(), source->size(), weights_.Data(),
+        1, weights_.GetCols(), source.size(), 1.0,
+        source.data(), source.size(), weights_.Data(),
         weights_.GetCols(), 0.0, destination_.data(), weights_.GetCols());
 
-    for (unsigned int g = 0; g < weights_.GetCols(); ++g)
+    for (unsigned g = 0; g < weights_.GetCols(); ++g)
     {
         destination_[g] = settings_.activation(destination_[g] + biases_[g]);
     }
-
 }
 
-void MatrixModel::Forward()
+void MatrixLayer::OutputSignal(const std::vector<fp_type> &source)
 {
-    auto layer = layers_.begin();
-
-    layer->Signal(letter_);
-    auto cur = &layer->destination_;
-
-    for (++layer; layer != layers_.end(); ++layer)
-    {
-        layer->Signal(cur);
-        cur = &layer->destination_;
-    }
+    // destination_ = source * weights_ + biases_
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        1, weights_.GetCols(), source.size(), 1.0,
+        source.data(), source.size(), weights_.Data(),
+        weights_.GetCols(), 0.0, destination_.data(), weights_.GetCols());
+    
+    destination_ = Func::Softmax(destination_);
 }
+
+void MatrixModel::Forward(data_vector &input)
+{
+    layers_[0].Signal(input);
+    auto cur = &layers_[0].destination_;
+    for (int k = 1; k < layers_.size() - 1; ++k)
+    {
+        layers_[k].Signal(*cur);
+        cur = &layers_[k].destination_;
+    }
+    layers_.back().OutputSignal(*cur);
+    // layers_.back().Signal(*cur);
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////
 // BACKWARD
 
-void MatrixLayer::UpdateWeights(const std::vector<fp_type> *source)
+void MatrixLayer::UpdateGradientsMatrix(const std::vector<fp_type> &source)
 {
-    for (unsigned int k = 0; k < weights_.GetRows(); ++k)
-    {
-        for (unsigned int g = 0; g < weights_.GetCols(); ++g)
-        {
-            delta_weights_(k, g) = delta_weights_(k, g) * settings_.momentum +
-                            learning_rate_ * gradients_[g] * (*source)[k] * (1.0 - settings_.momentum);
-            weights_(k, g) += delta_weights_(k, g);
-        }
-    }
-}
-
-void MatrixLayer::UpdateError(const std::vector<fp_type> &target)
-{
-    for (unsigned int g = 0; g < error_.size(); ++g)
-    {
-        error_[g] = target[g] - destination_[g];
-    }
-}
-
-void MatrixLayer::UpdateGradientsBiases()
-{
-    fp_type gradient_sum = 0.0;
     for (unsigned int g = 0; g < destination_.size(); ++g)
     {
-        gradients_[g] = settings_.derivative_activation(destination_[g]) * error_[g];
-        gradient_sum += std::pow(gradients_[g], 2);
-        biases_[g] += learning_rate_ * error_[g];
+        gradients_sum_[g] += gradients_[g];
     }
-    fp_type l = std::pow(gradient_, 2) * (fp_type)count_ + gradient_sum / gradients_.size();
 
-    ++count_;
-    gradient_ = std::sqrt(l / count_);
+    // gradients_matrix_ = source ^ T * gradients_
+    // cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+    //     source.size(), gradients_.size(), 1, learning_rate_,
+    //     source.data(), 1, gradients_.data(), gradients_.size(), 1.0,
+    //     gradients_matrix_.Data(), gradients_matrix_.GetCols());
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        source.size(), gradients_.size(), 1, 1.0,
+        source.data(), 1, gradients_.data(), gradients_.size(), 1.0,
+        gradients_matrix_.Data(), gradients_matrix_.GetCols());
+}
 
-    if (count_ > std::numeric_limits<int>::max() - 5)
+void MatrixLayer::UpdateGradients()
+{
+    for (unsigned g = 0; g < destination_.size(); ++g)
     {
-        std::cout << count_ << " COUNT ERROR\n";
+        gradients_[g] = settings_.derivative_activation(destination_[g]) * gradients_[g];
     }
 }
 
-void MatrixLayer::UpdateFirst(const std::vector<fp_type> *source)
+void MatrixLayer::Backward(MatrixLayer &prev_layer)
 {
-    UpdateGradientsBiases();
-    UpdateWeights(source);
-}
-
-void MatrixLayer::Update(MatrixLayer &prev_layer)
-{
-    UpdateGradientsBiases();
-
-    // prev_layer.error_ = gradients_ * weights_ ^ T
-    // matrix_t::MulBT(gradients_, weights_, prev_layer.error_);
+    // prev_layer.gradients_ = gradients_ * weights_ ^ T
+    // adam_cache_ = weights_ + delta_weights_;
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
         1, weights_.GetRows(), weights_.GetCols(), 1.0,
         gradients_.data(), weights_.GetCols(), weights_.Data(),
-        weights_.GetCols(), 0.0, prev_layer.error_.data(), weights_.GetRows());
+        weights_.GetCols(), 0.0, prev_layer.gradients_.data(), weights_.GetRows());
 
-    UpdateWeights(&prev_layer.destination_);
+    UpdateGradientsMatrix(prev_layer.destination_);
 }
 
-void MatrixModel::Backward(int answer)
+void MatrixLayer::OutputBackward(MatrixLayer &prev_layer, int answer)
+{   
+    for (unsigned g = 0; g < destination_.size(); ++g)
+    {
+        gradients_[g] = destination_[g];
+    }
+    gradients_[answer] -= Const::target.second;
+    Backward(prev_layer);
+}
+
+void MatrixLayer::InputBackward(const std::vector<fp_type> &source)
 {
-    std::vector<fp_type> target(settings_.layers.back(), Const::target.first);
-    target[answer] = Const::target.second;
+    UpdateGradients();
+    UpdateGradientsMatrix(source);
+}
 
-    int layer_k = layers_.size() - 1;
-    layers_[layer_k].UpdateError(target);
+void MatrixLayer::HiddenBackward(MatrixLayer &prev_layer)
+{
+    UpdateGradients();
+    Backward(prev_layer);
+}
 
-    for ( ; layer_k >= 1; --layer_k) {
-        layers_[layer_k].Update(layers_[layer_k - 1]);
+void MatrixModel::Backward(data_t &input)
+{
+    unsigned layer_k = layers_.size() - 1;
+
+    layers_[layer_k].OutputBackward(layers_[layer_k - 1], input.second);
+    for (--layer_k; layer_k >= 1; --layer_k)
+    {
+        layers_[layer_k].HiddenBackward(layers_[layer_k - 1]);
+    }
+    layers_[0].InputBackward(input.first);
+}
+
+//////////////////////////////////////////////////////////////////////////
+// UPDATE
+
+void MatrixLayer::UpdateWeights()
+{
+    for (unsigned g = 0; g < destination_.size(); ++g)
+    {
+        delta_biases_[g] = delta_biases_[g] * settings_.momentum +
+                        gradients_[g] * (1.0 - settings_.momentum);
+        // biases_[g] += learning_rate_ * gradients_sum_[g];
+        biases_[g] -= learning_rate_ * delta_biases_[g];
     }
 
-    layers_[0].UpdateFirst(letter_);
+    for (unsigned k = 0; k < weights_.GetRows(); ++k)
+    {
+        for (unsigned g = 0; g < weights_.GetCols(); ++g)
+        {
+            // MOMENTUM
+            delta_weights_(k, g) = delta_weights_(k, g) * settings_.momentum +
+                            gradients_matrix_(k, g) * (1.0 - settings_.momentum);
+            weights_(k, g) -= learning_rate_ * delta_weights_(k, g);
+
+            // NESTEROV
+            // delta_weights_(k, g) = delta_weights_(k, g) * settings_.momentum +
+            //                 gradients_matrix_(k, g) * learning_rate_;
+            // weights_(k, g) += delta_weights_(k, g);
+            // adam_cache_(k, g) = weights_(k, g) + delta_weights_(k, g);
+
+            // ADAM
+            // adam_m_(k, g) = settings_.adam_beta1 * adam_m_(k, g) +
+            //                 (1.0 - settings_.adam_beta1) * gradients_matrix_(k, g);
+            // adam_v_(k, g) = settings_.adam_beta2 * adam_v_(k, g) +
+            //                 (1.0 - settings_.adam_beta2) * std::pow(gradients_matrix_(k, g), 2);
+            // adam_m_(k, g) /= (1.0 - std::pow(settings_.adam_beta1, adam_t_));
+            // // adam_v_(k, g) /= (1.0 - std::pow(settings_.adam_beta2, adam_t_));
+            // fp_type m_hat = adam_m_(k, g) / (1.0 - std::pow(settings_.adam_beta1, adam_t_));
+            // fp_type v_hat = adam_v_(k, g) / (1.0 - std::pow(settings_.adam_beta2, adam_t_));
+            // weights_(k, g) -= learning_rate_ * m_hat
+            //                 / (std::sqrt(v_hat) + settings_.adam_epsilon);
+
+            // delta_weights_(k, g) = delta_weights_(k, g) * settings_.momentum +
+            //                 gradients_matrix_(k, g) * (1.0 - settings_.momentum);
+                        
+            // adam_cache_(k, g) = settings_.adam_beta * adam_cache_(k, g) +
+            //                 (1.0 - settings_.adam_beta) * std::pow(gradients_matrix_(k, g), 2);
+            // weights_(k, g) += learning_rate_ * delta_weights_(k, g)
+            //                 / (std::sqrt(adam_cache_(k, g)) + settings_.adam_epsilon);
+        }
+    }
+    ++adam_t_;
+    // adam_cache_ = weights_ + delta_weights_;
+
+    std::fill(gradients_sum_.begin(), gradients_sum_.end(), 0.0);
+    std::fill(gradients_matrix_.DataVector().begin(), gradients_matrix_.DataVector().end(), 0.0);
+}
+
+void MatrixLayer::UpdateWeights(int threads)
+{
+    for (unsigned g = 0; g < destination_.size(); ++g)
+    {
+        biases_[g] += learning_rate_ * gradients_sum_[g];
+    }
+
+    // for (unsigned k = 0; k < weights_.GetRows(); ++k)
+    // {
+    //     for (unsigned g = 0; g < weights_.GetCols(); ++g)
+    //     {
+    //         delta_weights_(k, g) = delta_weights_(k, g) * settings_.momentum +
+    //                         gradients_matrix_(k, g) * (1.0 - settings_.momentum);
+    //         weights_(k, g) += delta_weights_(k, g);
+    //     }
+    // }
+    std::vector<std::thread> tv;
+    for (unsigned thc = 0; thc < threads; ++thc)
+    {
+        tv.emplace_back([&, thc] {
+            unsigned delta = weights_.GetRows() / threads;
+            unsigned end = (thc == threads - 1 ? weights_.GetRows() : (thc + 1) * delta);
+            for (unsigned k = thc * delta; k < end; ++k)
+            {
+                for (unsigned g = 0; g < weights_.GetCols(); ++g)
+                {
+                    delta_weights_(k, g) = delta_weights_(k, g) * settings_.momentum +
+                                    gradients_matrix_(k, g) * (1.0 - settings_.momentum);
+                    weights_(k, g) += delta_weights_(k, g);
+                }
+            }
+        });
+    }
+    for (auto &thread : tv)
+    {
+        thread.join();
+    }
+
+    // for (unsigned thc = 0; thc < threads; ++thc) {
+    //     thrs.emplace_back([&, thc](){
+    //         unsigned delta = n / threads;
+    //         unsigned end = (thc == threads - 1 ? n : (thc + 1) * delta);
+    //         for (unsigned i = thc * delta; i < end; ++i) {
+    //             for (unsigned j = 0; j < n; ++j) {
+    //                 T sum = 0;
+    //                 for (unsigned l = 0; l < n; ++l) {
+    //                     sum += A[i * n + l] * B[l * n + j];
+    //                 }
+    //                 C[i * n + j] = sum;
+    //             }
+    //         }
+    //     });
+    // }
+
+    std::fill(gradients_sum_.begin(), gradients_sum_.end(), 0.0);
+    std::fill(gradients_matrix_.DataVector().begin(), gradients_matrix_.DataVector().end(), 0.0);
+}
+
+
+void MatrixModel::UpdateWeights()
+{   
+    for (auto &layer : layers_)
+    {
+        layer.UpdateWeights();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -146,9 +280,10 @@ void MatrixModel::Backward(int answer)
 
 int MatrixModel::GetResult()
 {
-    fp_type max = -std::numeric_limits<fp_type>::infinity(), result = 0.0;
+    fp_type max = -std::numeric_limits<fp_type>::infinity();
+    int result = 0;
     const auto &output = layers_.back().destination_;
-    for (unsigned int k = 0; k < output.size(); ++k) 
+    for (unsigned k = 0; k < output.size(); ++k) 
     {
         if (max < output[k])
         {
@@ -177,7 +312,6 @@ MatrixLayer::MatrixLayer(size_t rows, size_t cols, fp_type lr, const PerceptronS
     , biases_(cols)
     , destination_(cols)
     , gradients_(cols)
-    , error_(cols)
     , settings_(settings)
     , learning_rate_(lr)
 {    

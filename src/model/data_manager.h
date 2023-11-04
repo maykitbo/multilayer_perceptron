@@ -75,14 +75,14 @@ class DataManager {
          * @brief passes throw the test part of dataset and applies the function to each letter
          * @param func A user-defined function that processes each letter in the testing dataset.
          */
-        void ForTest(const std::function<void(data_vector&, int)> func);
+        void ForTest(const std::function<void(data_t&)> func);
 
         /**
          * @brief passes throw the train part of dataset and applies the function to each letter
          * if SetMetrics have been called, then the function will be applied more often to the letters with the worst metrics
          * @param func A user-defined function that processes each letter in the training dataset.
          */
-        void ForTrain(const std::function<void(data_vector&, int)> func);
+        void ForTrain(const std::function<void(data_t&)> func, int batch);
         
         /**
          * @brief change part of train dataset. Creates new part of train dataset from test dataset
@@ -110,13 +110,27 @@ class DataManager {
          * @brief Prints the letter to the console
          * @param one the letter to be printed
          */
-        static void PrintLetter(const data_vector &one);
+        static void PrintLetter(const data_t &one);
 
         /**
          * @brief Prints n letters to the console
          * @param n the number of letters to be printed
          */
         void Printn(int n);
+
+        /**
+         * @brief Get the Letters object
+         * @return dataset_t& the dataset
+         */
+        dataset_t &GetLetters() { return letters_; }
+
+        /**
+         * @brief Get the Letters object
+         * @return const dataset_t& the dataset
+         */
+        const dataset_t &GetLetters() const { return letters_; }
+
+        void IncreaseRoatation(int angle);
     
     private:
         void ReadNoRotate(std::fstream &file, data_vector &letter);
@@ -125,11 +139,13 @@ class DataManager {
         // void Read270Rotate(std::fstream &file, data_vector &letter);
         auto ReadFunctionSwitch(LetterRotate rotate);
 
+        std::vector<fp_type> Rotate(const std::vector<fp_type> &source, int angle);
+
         dataset_t letters_;
         size_t width_, height_, size_ = 0;
         fp_type test_proportion_, train_proportion_;
-        std::vector<fp_type> metric_;
-        fp_type metric_sum_;
+        // std::vector<fp_type> metric_;
+        // fp_type metric_sum_;
         unsigned cross_k_, classes_;
 
 };

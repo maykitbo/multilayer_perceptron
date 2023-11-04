@@ -24,41 +24,48 @@ class Model {
 
         /**
          * @brief Train the model using training data.
-         * @param letters DataManager dataset.
+         * @param inputs DataManager dataset.
          * @param epoch_count Number of training epochs.
+         * @param batch Batch size for training.
          * @param stop A flag to control the training loop.
          * @param error_thread Flag to send errors to a separate thread.
          * @param metric_thread Flag to send metrics to a separate thread.
          */
-        void Train(DataManager &letters, unsigned int epoch_count, unsigned batch,
+        void Train(DataManager &inputs, unsigned int epoch_count, unsigned batch,
                 bool &stop, bool error_thread = true, bool metric_thread = true);
 
         /**
          * @brief Test the model using test data.
-         * @param letters DataManager dataset.
+         * @param inputs DataManager dataset.
          * @return Metrics object containing evaluation results.
          */
-        Metrics Test(DataManager &letters);
+        Metrics Test(DataManager &inputs);
 
         /**
          * @brief Predict the letter for a given data vector.
          * @param letter Data vector for prediction.
          * @return Predicted letter as a char.
          */
-        char Predict(data_vector &letter);
+        char Predict(data_vector &input);
 
         /**
          * @brief virtual Forward function. Forward the letter through the model
          * have to be implemented in the child class
          */
-        virtual void Forward() = 0;
+        virtual void Forward(data_vector &input) = 0;
 
         /**
          * @brief virtual Backward function. Backward the letter through the model
          * have to be implemented in the child class
          * @param answer int Answer. Correct class of the letter
          */
-        virtual void Backward(int answer) = 0;
+        virtual void Backward(data_t &input) = 0;
+
+        /**
+         * @brief virtual function to update the weights of the model
+         * have to be implemented in the child class
+         */
+        virtual void UpdateWeights() = 0;
 
         /**
          * @brief Virtual function to retrieve the model's result.
@@ -89,20 +96,8 @@ class Model {
          */
         virtual ~Model() = default;
 
-        /**
-         * @brief Set the data vector for processing.
-         * @param letter Pointer to a data vector.
-         */
-
-        void SetLetter(data_vector *letter) {
-            letter_ = letter;
-        }
-
     protected:
-        /**
-         * @brief Pointer to the data vector currently being processed.
-         */
-        data_vector *letter_;
+        // std::vector<const data_vector&> sources_;
 
         /**
          * @brief Settings for the Perceptron model.

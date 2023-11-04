@@ -30,13 +30,16 @@ struct PerceptronSettings {
          */
         PerceptronSettings() = default;
 
-        size_vector layers;         ///< Vector of layer sizes in the model.
-        fp_type learning_rate;      ///< Learning rate for weight updates.
-        fp_type momentum = 0.0;     ///< Momentum coefficient for weight updates. Default value is 0.0.
-        fp_type lr_epoch_k = 1.0;   ///< Learning rate scaling factor per epoch. Default value is 1.0.
-        fp_type lr_layers_k = 1.0;  ///< Learning rate scaling factor per layer. Default value is 1.0.
-        fp_type weight_mean = 0.0;  ///< Mean for weight initialization. Default value is 0.0.
-        fp_type weight_sd = 1.0;    ///< Standard deviation for weight initialization. Default value is 1.0.
+        size_vector layers;          ///< Vector of layer sizes in the model.
+        fp_type learning_rate;       ///< Learning rate for weight updates.
+        fp_type momentum = 0.0;      ///< Momentum coefficient for weight updates. Default value is 0.0.
+        fp_type lr_epoch_k = 1.0;    ///< Learning rate scaling factor per epoch. Default value is 1.0.
+        fp_type lr_layers_k = 1.0;   ///< Learning rate scaling factor per layer. Default value is 1.0.
+        fp_type weight_mean = 0.0;   ///< Mean for weight initialization. Default value is 0.0.
+        fp_type weight_sd = 1.0;     ///< Standard deviation for weight initialization. Default value is 1.0.
+        fp_type adam_beta1 = 0.9;     ///< Beta1 parameter for Adam optimizer. Default value is 0.9.
+        fp_type adam_beta2 = 0.999;    ///< Beta2 parameter for Adam optimizer. Default value is 0.999.
+        fp_type adam_epsilon = 1e-8; ///< Epsilon parameter for Adam optimizer. Default value is 1e-8.
         
         /**
          * @brief Set the activation function and its derivative based on an enumeration value.
@@ -82,5 +85,6 @@ struct PerceptronSettings {
         ActivationFunctions activation_i;                          ///< Activation function index.
         WeightInitFunctions weight_init_i;                        ///< Weight initialization function index.
 };
+
 
 } // namespace s21

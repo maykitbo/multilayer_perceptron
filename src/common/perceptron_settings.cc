@@ -17,6 +17,10 @@ void PerceptronSettings::SetActivation(ActivationFunctions index) {
             activation = Func::ActivationReLU;
             derivative_activation = Func::DerivativeActivationReLU;
             break;
+        case kTanh:
+            activation = Func::ActivationTanh;
+            derivative_activation = Func::DerivativeActivationTanh;
+            break;
     }
 }
 
@@ -31,6 +35,9 @@ void PerceptronSettings::SetWeightInit(WeightInitFunctions index) {
             break;
         case kXavier:
             weight_init = Func::XavierWeightsInit;
+            break;
+        case kHE:
+            weight_init = Func::HEWeightsInit;
             break;
     }
 }
@@ -76,7 +83,7 @@ PerceptronSettings::PerceptronSettings(std::ifstream &os) {
     weight_init_i = WeightInitFunctions(parse_int("\tweight init function "));
     weight_mean = parse_double("\tweight mean ");
     weight_sd = parse_double("\tweight sd ");
-    Func::xavier = parse_double("\tweight xavier k ");
+    // Func::xavier = parse_double("\tweight xavier k ");
     momentum = parse_double("\tmomentum ");
     lr_epoch_k = parse_double("\tlr epoch k ");
     lr_layers_k = parse_double("\tlr layers k ");
@@ -99,7 +106,7 @@ void PerceptronSettings::ToFile(std::ostream& os) {
     os << "\n\tweight init function " << weight_init_i;
     os << "\n\tweight mean " << weight_mean;
     os << "\n\tweight sd " << weight_sd;
-    os << "\n\tweight xavier k " << Func::xavier;
+    // os << "\n\tweight xavier k " << Func::xavier;
     os << "\n\tmomentum " << momentum;
     os << "\n\tlr epoch k " << lr_epoch_k;
     os << "\n\tlr layers k " << lr_layers_k;

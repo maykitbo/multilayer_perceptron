@@ -1,0 +1,97 @@
+PerceptronSettings {
+	layers [784, 96, 64, 48, 32, 29, 26]
+	learning rate 0.0005
+	activation function 1
+	weight init function 1
+	weight mean 0
+	weight sd 1
+	momentum 0.2
+	lr epoch k 0.98
+	lr layers k 0.99
+}
+Time = 88255
+6 64
+1 0.127293
+1 0.101628
+1 0.0856583
+1 0.0756189
+1 0.0693141
+1 0.0665667
+1 nan
+1 nan
+1 -nan
+2 nan
+2 nan
+2 -nan
+2 -nan
+2 nan
+2 -nan
+2 -nan
+2 nan
+2 -nan
+3 nan
+3 nan
+3 -nan
+3 -nan
+3 nan
+3 -nan
+3 -nan
+3 nan
+3 -nan
+4 nan
+4 nan
+4 -nan
+4 -nan
+4 nan
+4 -nan
+4 -nan
+4 nan
+4 -nan
+5 nan
+5 nan
+5 -nan
+5 -nan
+5 nan
+5 -nan
+5 -nan
+5 nan
+5 -nan
+6 nan
+6 nan
+6 -nan
+6 -nan
+6 nan
+6 -nan
+6 -nan
+6 nan
+6 -nan
+
+
+0.038476
+0.038476
+0.038476
+0.038476
+0.038476
+0.038476
+0.038476 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.038476 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.038476 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.038476 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.038476 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.038476 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+
+
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+
+
+0.0741008 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0741008 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0741008 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0741008 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0741008 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 
+0.0741008 -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan -nan 

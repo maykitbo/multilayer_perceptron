@@ -29,10 +29,17 @@ typedef Matrix<fp_type> matrix_t;
 typedef std::vector<fp_type> data_vector;
 
 /**
- * @typedef dataset_t
- * @brief Type alias for a 2D vector of data_vector used to represent a dataset.
+ * @typedef data_vector
+ * @brief Type alias for a vector of floating-point values used to represent data points.
  */
-typedef std::vector<std::vector<data_vector>> dataset_t;
+typedef std::pair<data_vector, int> data_t;
+
+/**
+ * @typedef dataset_t
+ * @brief Type alias for vector of data_vector used to represent a dataset.
+ */
+// typedef std::vector<std::vector<data_vector>> dataset_t;
+typedef std::vector<data_t> dataset_t;
 
 } // namespace s21
 

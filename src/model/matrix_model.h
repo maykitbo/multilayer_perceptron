@@ -6,6 +6,9 @@
 #include "model.h"
 #include <numeric>
 #include <limits>
+#include <algorithm>
+#include <execution>
+#include <thread>
 
 #include <cblas.h>
 
@@ -44,6 +47,7 @@ class MatrixLayer {
         MatrixLayer(size_t rows, size_t cols, fp_type lr, const PerceptronSettings &settings, std::ifstream &file);
 
         MatrixLayer() = delete;
+        ~MatrixLayer() = default;
 
         /**
          * @brief Signals the layer with input data.
@@ -51,7 +55,9 @@ class MatrixLayer {
          *
          * @param source Pointer to the source input data.
          */
-        void Signal(const std::vector<fp_type> *source);
+        void Signal(const std::vector<fp_type> &source);
+
+        void OutputSignal(const std::vector<fp_type> &source);
 
         /**
          * @brief Updates the weights based on the source data.
@@ -59,7 +65,12 @@ class MatrixLayer {
          *
          * @param source Pointer to the source input data.
          */
-        void UpdateWeights(const std::vector<fp_type> *source);
+        void UpdateGradientsMatrix(const std::vector<fp_type> &source);
+
+
+        void UpdateWeights();
+        void UpdateWeights(int threads);
+
 
         /**
          * @brief Updates the first layer's weights based on the source data.
@@ -67,7 +78,11 @@ class MatrixLayer {
          *
          * @param source Pointer to the source input data.
          */
-        void UpdateFirst(const std::vector<fp_type> *source);
+        // void BackwardFirst(const std::vector<fp_type> &source);
+
+        void OutputBackward(MatrixLayer &prev_layer, int answer);
+        void InputBackward(const std::vector<fp_type> &source);
+        void HiddenBackward(MatrixLayer &prev_layer);
 
         /**
          * @brief Updates the weights based on the previous layer's output.
@@ -75,28 +90,38 @@ class MatrixLayer {
          *
          * @param prev_layer Reference to the previous layer.
          */
-        void Update(MatrixLayer &prev_layer);
+        void Backward(MatrixLayer &prev_layer);
+
+        // void Backward1(MatrixLayer &prev_layer);
+
 
         /**
          * @brief Updates gradients and biases for backpropagation.
          */
-        void UpdateGradientsBiases();
+        void UpdateGradients();
 
         /**
          * @brief Updates the error for backpropagation based on the target data.
          *
          * @param target The target output data.
          */
-        void UpdateError(const std::vector<fp_type> &target);
+        // void UpdateError(int answer);
 
     private:
         matrix_t weights_, delta_weights_;
-        std::vector<fp_type> biases_, destination_, gradients_, error_;
-        fp_type gradient_ = 0.0;
+        matrix_t gradients_matrix_;
+        std::vector<fp_type> biases_, destination_;
+        std::vector<fp_type> gradients_, gradients_sum_;
         const PerceptronSettings &settings_;
         fp_type learning_rate_;
-        int count_ = 0;
+
+        matrix_t adam_cache_;
+        matrix_t adam_m_;
+        matrix_t adam_v_;
+        size_t adam_t_{1};
+        std::vector<float> delta_biases_;
 };
+
 
 /**
  * @class MatrixModel
@@ -112,6 +137,8 @@ class MatrixModel : public Model {
          */
         MatrixModel(const PerceptronSettings &settings);
 
+        PerceptronSettings &GetSettings() { return settings_; }
+
         /**
          * @brief Constructs a MatrixModel by loading model data from a file.
          *
@@ -124,14 +151,21 @@ class MatrixModel : public Model {
         /**
          * @brief Overrides the forward propagation method for the matrix-based model.
          */
-        void Forward() override;
+        void Forward(data_vector &input) override;
 
         /**
          * @brief Overrides the backward propagation method for the matrix-based model.
          *
          * @param answer The correct class label for the input data.
          */
-        void Backward(int answer) override;
+        void Backward(data_t &input) override;
+
+        /**
+         * @brief Overrides the method to update the weights for the model.
+         */
+        void UpdateWeights() override;
+
+        ~MatrixModel() = default;
 
         /**
          * @brief Overrides the method to retrieve the model's result.
@@ -154,9 +188,10 @@ class MatrixModel : public Model {
     
     private:
         std::vector<MatrixLayer> layers_;
-        int count_ = 0;
+
         fp_type GetMeanError() override {
-            return Func::MeanError(layers_.back().error_);
+            // return Func::MeanError(layers_.back().error_);
+            return Func::MeanError(layers_.back().gradients_);
         }
 
 };
