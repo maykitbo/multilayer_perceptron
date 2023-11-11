@@ -3,8 +3,6 @@
 using namespace s21;
 
 fp_type Func::XavierWeightsInit(int rows, int cols) {
-    // fp_type variance = std::sqrt(2.0 / (fp_type)(rows + cols));
-    // return s21::Random::Normal<fp_type>(0.0, variance);
     fp_type xavier = std::sqrt(6.0 / (fp_type)(rows + cols));
     return s21::Random::Uniform(-xavier, xavier);
 }
